@@ -12,7 +12,7 @@ let mapPAD : [String:[Double]] = [  "distress": [-0.61,0.28,-0.36],
                                     "relief": [0.29,-0.19,-0.28],
                                     "happy-for": [0.64,0.35,0.25],
                                     "resentment": [-0.35,0.35,0.29],
-                                    "pity": [-0.52,0.02,-0.21], // regreful
+                                    "pity": [-0.52,0.02,-0.21], // regretful
                                     "gloating": [-0.45,0.48,0.42], // cruel
                                     "gratitude": [0.64,0.16,-0.21], // grateful
                                     "anger": [-0.51,0.59,0.25],
