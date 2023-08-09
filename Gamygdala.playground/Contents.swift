@@ -1,9 +1,5 @@
 import Foundation
 
-
-
-
-
 let brain = Gamygdala()
 brain.createAgent(agentName: "village")
 /* Example 1 Relief */
