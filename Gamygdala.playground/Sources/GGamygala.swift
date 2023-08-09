@@ -21,6 +21,13 @@ let mapPAD : [String:[Double]] = [  "distress": [-0.61,0.28,-0.36],
                                     "dummy": []
 ]
 
+
+extension Double {
+    func dec2() -> String {
+        return String(format: "%.2f", self)
+    }
+}
+
 public class Gamygdala {
     
     var agents : [Gamygdala.Agent] = []
@@ -73,13 +80,11 @@ public class Gamygdala {
         }
         
         public var description : String  {
-            var output : String = like >= 0 ? "\(agentName) is liked (\(like)): " : "\(agentName) is disliked (\(like)): "
+            var output : String = like >= 0 ? "\(agentName) is liked (\(like.dec2())): " : "\(agentName) is disliked (\(like.dec2())): "
             for emotion in emotionList {
                 output += "\(emotion)"
                 if emotion != emotionList.last {
                     output += ", "
-                } else {
-                    output += "\n"
                 }
             }
             return output
@@ -152,12 +157,12 @@ public class Gamygdala {
         public func updateEmotionalState(emotion : Emotion) {
             for internalState in internalStates {
                 if internalState.name == emotion.name {
-                    print("\(name) updated emotion \(emotion.name) with intensity \(emotion.intensity)")
+                    print("\(name) updated emotion \(emotion.name) with intensity \(emotion.intensity.dec2())")
                     internalState.intensity += emotion.intensity
                     return
                 }
             }
-            print("\(name) added emotion \(emotion.name) with intensity \(emotion.intensity)")
+            print("\(name) added emotion \(emotion.name) with intensity \(emotion.intensity.dec2())")
             internalStates.append(emotion)
         }
                 
@@ -192,11 +197,11 @@ public class Gamygdala {
         }
         
         public func printEmotionalState(useGain : Bool) {
-            var output = "\(self.name) feels "
+            var output = "\(self.name) feels: \n\t"
             let emotionalState = self.getEmotionalState(useGain: useGain)
             var i = 0
             for emotion in emotionalState {
-                output += "\(emotion.name) : \(emotion.intensity), "
+                output += "\(emotion.name) : \(emotion.intensity.dec2()), "
                 i += 1
             }
             if i > 0 {
@@ -226,17 +231,25 @@ public class Gamygdala {
         }
 
         public func printRelations(filterName : String = "") {
-            var output = "\(name) has the following sentiments: \n"
+            if currentRelations.count == 0 {
+                return
+            }
+            var output = "\(name) has the following sentiments: \n\t"
+            var counter = 0
             for (targetName, relation) in currentRelations {
                 
                 if targetName == filterName || filterName == "" {
                     for emotion in relation.emotionList {
-                        output += "\(emotion.name) (\(emotion.intensity))"
+                        output += "\(emotion.name) (\(emotion.intensity.dec2()))"
                         if emotion != relation.emotionList.last {
                             output += ", "
                         }
                     }
-                    output += " for \(targetName) \n"
+                    output += " for \(targetName)"
+                }
+                counter += 1
+                if counter < currentRelations.keys.count {
+                    output += "\n\t"
                 }
             }
             print(output)
@@ -244,16 +257,17 @@ public class Gamygdala {
         
         public func decay(brain : Gamygdala) {
             var updatedStates : [Emotion] = []
-            print("\(name) was decaying for:")
             for state in internalStates {
+                if state == internalStates.first {
+                    //print("\(name) was decaying for:")
+                }
                 let newIntensity = brain.decay(intensity : state.intensity)
-                print("\t \(state.name) of \(newIntensity) from \(state.intensity)")
+                //print("\t \(state.name) (\(state.intensity.dec2()) -> \(newIntensity.dec2()))")
                 if (newIntensity >= 0) {
                     state.intensity = newIntensity
                     updatedStates.append(state)
                 }
             }
-            print("")
             for (_,relation) in currentRelations {
                 relation.decay(brain: brain)
             }
@@ -266,28 +280,37 @@ public class Gamygdala {
     public class Belief : CustomStringConvertible {
         
         public var likelihood : Double
-        var causalAgent : String
+        var causalAgent : String?
         var affectedGoalNames : [String]
         var goalCongruences : [Double]
         var isIncremental : Bool
         
-        public init(likelihood: Double, causalAgent: String, affectedGoalNames: [String], goalCongruences: [Double], isIncremental: Bool) {
+        public init(likelihood: Double, causalAgent: String?, affectedGoalNames: [String], goalCongruences: [Double], isIncremental: Bool) {
             self.likelihood = likelihood
-            self.causalAgent = causalAgent
+            if let agent = causalAgent {
+                self.causalAgent = agent
+            }
             self.affectedGoalNames = affectedGoalNames
             self.goalCongruences = goalCongruences
             self.isIncremental = isIncremental
         }
         
         public var description: String {
-            var output : String = "\(causalAgent)'s belief with likelihood \(likelihood) to impact: \n"
+            var output : String = "Some event with likelihood \(likelihood.dec2()): \n"
+            var i : Int = 0
             for affectedGoalName in affectedGoalNames {
+                output += goalCongruences[i] > 0.0 ? "promotes " : "deminish "
                 output += "\(affectedGoalName)"
                 if affectedGoalName != affectedGoalNames.last {
                     output += ", "
                 } else {
-                    output += "\n"
+                    if let agent = causalAgent {
+                        output += "\n and is caused by \(agent) \n"
+                    } else {
+                        output += "\n"
+                    }
                 }
+                i += 1
             }
             return output
         }
@@ -350,10 +373,13 @@ public class Gamygdala {
     
     
     
-    public func decayAll() {
-        for agent in agents {
-            agent.decay(brain: self)
+    public func decayAll( iterations : Int = 3) {
+        for _ in 0..<iterations {
+            for agent in agents {
+                agent.decay(brain: self)
+            }
         }
+        print("updatering decay of emotions .... ")
     }
     
     public func decay (intensity : Double) -> Double {
@@ -395,7 +421,7 @@ public class Gamygdala {
     }
 
     
-    public func appraiseBelief(likelihood : Double, causalAgentName : String, affectedGoals : [String], goalCongruences : [Double], isIncremental : Bool) {
+    public func appraiseBelief(likelihood : Double, causalAgentName : String? = nil, affectedGoals : [String], goalCongruences : [Double], isIncremental : Bool) {
         let tempBelief = Belief(likelihood: likelihood, causalAgent: causalAgentName, affectedGoalNames: affectedGoals, goalCongruences: goalCongruences, isIncremental: isIncremental)
         appraise(someBelief: tempBelief)
     }
@@ -417,23 +443,24 @@ public class Gamygdala {
             if let currentGoal = getGoalByName(goalName: goalName) {
                 let utility = currentGoal.utility
                 let preLH = currentGoal.likelihood
+                let desirability = someBelief.goalCongruences[goalIdx] * utility
                 let deltaLikelihood = calculateDeltaLikelihood(goal: currentGoal, eventCongruence: someBelief.goalCongruences[goalIdx], eventLikelihood: someBelief.likelihood, isIncremental: someBelief.isIncremental)
                 
-                let desirability = deltaLikelihood * utility
+                //let desirability = deltaLikelihood * utility
                 //print("==================================================================================================================")
-                print("Evaluated goal '\(goalName)' \n\t (utility = \(utility), deltaLH = \(deltaLikelihood), oldLH = \(preLH), newLH = \(currentGoal.likelihood), disirability = \(desirability))")
+                print("Evaluated goal '\(goalName)': (utility = \(utility.dec2()), deltaLH = \(deltaLikelihood.dec2()), oldLH = \(preLH.dec2()), newLH = \(currentGoal.likelihood.dec2()), desirability = \(desirability.dec2()))")
                 //print("==================================================================================================================")
                 for agent in agents {
                     if agent.hasGoal(goalName: goalName) {
                         print("..... owned by \(agent.name)")
                         evaluateInternalEmotion(utility: utility, deltaLikelihood: deltaLikelihood, likelihood: currentGoal.likelihood, agent: agent)
-                        EvaluateActions(affectedName: agent.name, causalName: someBelief.causalAgent, selfName: agent.name, desirability: desirability, utility: utility, DeltaLikelihood: deltaLikelihood)
+                        EvaluateActions(affectedName: agent.name, causalAgentName: someBelief.causalAgent, selfName: agent.name, desirability: desirability, utility: utility, DeltaLikelihood: deltaLikelihood)
                         for other in agents {
                             if let relation = other.getRelation(agentName: agent.name) {
                                 print("\(other.name) has relationship with \(agent.name)")
                                 print("\(relation)")
                                 evaluateSocialEmotion(utility: utility, desirability: desirability, deltaLikelihood: deltaLikelihood, relation: relation, agent: other)
-                                EvaluateActions(affectedName: agent.name, causalName: someBelief.causalAgent, selfName: other.name, desirability: desirability, utility: utility, DeltaLikelihood: deltaLikelihood)
+                                EvaluateActions(affectedName: agent.name, causalAgentName: someBelief.causalAgent, selfName: other.name, desirability: desirability, utility: utility, DeltaLikelihood: deltaLikelihood)
                             }
                         }
                     }
@@ -456,7 +483,7 @@ public class Gamygdala {
         let oldLikelihood = goal.likelihood
         var newLikelihood : Double = 0
         if (goal.maintenanceGoal == false && (oldLikelihood >= 1 || oldLikelihood <= -1)) {
-            print("-== Goal \(goal.name) likelihood \(oldLikelihood) was at maximum and was not adjusted ==-")
+            print("-== Goal \(goal.name) likelihood \(oldLikelihood.dec2()) was at maximum and was not adjusted ==-")
             return 0
         } else {
             if isIncremental {
@@ -489,40 +516,33 @@ public class Gamygdala {
                 positive = true
             }
         }
-        //print("-----==== EVALUATING INTERNAL EMOTION =====-------")
-        //print("\t Utility = \(utility), LH = \(likelihood), dLH = \(deltaLikelihood)")
-        //print("-----==== EVALUATING INTERNAL EMOTION =====-------")
         if(likelihood > 0 && likelihood < 1) {
-            //print(" Possible Emotions: hope or fear ")
             if (positive){
                 emotions.append("hope")
             }else {
                 emotions.append("fear")
             }
         } else if(likelihood == 1){
-            //print(" Possible Emotions: satisfaction, joy, fear-conf, distress ")
             if (utility >= 0){
-                if(deltaLikelihood > 0.5){
+                if(abs(deltaLikelihood) < 0.5){
                     emotions.append("satisfaction")
                 }
                 emotions.append("joy")
             }
             else {
-                if(deltaLikelihood  > 0.5 ) {
+                if(abs(deltaLikelihood)  < 0.5 ) {
                     emotions.append("fear-confirmed")
                 }
                 emotions.append("distress")
             }
-        } else if (likelihood == 0) {
-            /* So we have to come from likelihood of -1 and added delta +1 so LH = 0 */
-            //print(" Possible Emotions: disappointment, distress, relief, joy ")
+        } else if (likelihood == 0.0) {
             if( utility >= 0) {
-                if( deltaLikelihood < -0.5 ) {
+                if( abs(deltaLikelihood) > 0.5 ) {
                     emotions.append("disappointment")
                 }
                 emotions.append("distress")
             }else {
-                if( deltaLikelihood < -0.5 ) {
+                if( abs(deltaLikelihood) > 0.5 ) {
                     emotions.append("relief")
                 }
                 emotions.append("joy")
@@ -531,7 +551,7 @@ public class Gamygdala {
         intensity = abs(utility * deltaLikelihood)
         if (intensity != 0){
             for emotion in emotions {
-                print("Emotion to be added \(emotion) ... ")
+                //print("Emotion to be added \(emotion) ... ")
                 agent.updateEmotionalState(emotion: Emotion(name: emotion, intensity: intensity))
             }
         }
@@ -560,58 +580,56 @@ public class Gamygdala {
         }
     }
     
-    private func EvaluateActions(affectedName : String, causalName : String, selfName : String, desirability : Double, utility : Double, DeltaLikelihood : Double) {
-        var emotionName = ""
-        
-        if (affectedName == selfName && selfName != causalName) {
-            if (desirability >= 0) {
-                emotionName = "gratitude"
-            } else {
-                emotionName = "anger"
-            }
-            let emotion = Emotion(name: emotionName, intensity: abs(utility * DeltaLikelihood))
-            if let agent = getAgentByName(NameOfAgent: selfName) {
-                if let relation = agent.getRelation(agentName: causalName) {
-                    relation.addEmotion(emotion: emotion)
+    private func EvaluateActions(affectedName : String, causalAgentName : String?, selfName : String, desirability : Double, utility : Double, DeltaLikelihood : Double) {
+        if let causalName = causalAgentName {
+            var emotionName = ""
+            
+            if (affectedName == selfName && selfName != causalName) {
+                if (desirability >= 0) {
+                    emotionName = "gratitude"
                 } else {
-                    let relation = agent.updateRelation(targetName: causalName, like: 0.0)
-                    relation.addEmotion(emotion: emotion)
+                    emotionName = "anger"
                 }
-                agent.updateEmotionalState(emotion: emotion)
-            }
-        }
-        
-        if (affectedName == selfName && selfName == causalName) {
-            // Not implemented here
-            // Should include pride and shame
-        }
-        
-        if (affectedName != selfName && selfName == causalName) {
-            if let agent = getAgentByName(NameOfAgent: causalName) {
-                if let relation = agent.getRelation(agentName: affectedName) {
-                    if desirability >= 0 {
-                        if relation.like >= 0 {
-                            let emotionName = "gratification"
-                            let emotion = Emotion(name: emotionName, intensity: abs(utility * DeltaLikelihood * relation.like))
-                            relation.addEmotion(emotion: emotion)
-                            agent.updateEmotionalState(emotion: emotion)
-                        }
+                let emotion = Emotion(name: emotionName, intensity: abs(utility * DeltaLikelihood))
+                if let agent = getAgentByName(NameOfAgent: selfName) {
+                    if let relation = agent.getRelation(agentName: causalName) {
+                        relation.addEmotion(emotion: emotion)
                     } else {
-                        if relation.like >= 0 {
-                            let emotionName = "remorse"
-                            let emotion = Emotion(name: emotionName, intensity: abs(utility * DeltaLikelihood * relation.like))
-                            relation.addEmotion(emotion: emotion)
-                            agent.updateEmotionalState(emotion: emotion)
+                        let relation = agent.updateRelation(targetName: causalName, like: 0.0)
+                        relation.addEmotion(emotion: emotion)
+                    }
+                    agent.updateEmotionalState(emotion: emotion)
+                }
+            }
+            
+            if (affectedName == selfName && selfName == causalName) {
+                // Not implemented here
+                // Should include pride and shame
+            }
+            
+            if (affectedName != selfName && selfName == causalName) {
+                if let agent = getAgentByName(NameOfAgent: causalName) {
+                    if let relation = agent.getRelation(agentName: affectedName) {
+                        if desirability >= 0 {
+                            if relation.like >= 0 {
+                                let emotionName = "gratification"
+                                let emotion = Emotion(name: emotionName, intensity: abs(utility * DeltaLikelihood * relation.like))
+                                relation.addEmotion(emotion: emotion)
+                                agent.updateEmotionalState(emotion: emotion)
+                            }
+                        } else {
+                            if relation.like >= 0 {
+                                let emotionName = "remorse"
+                                let emotion = Emotion(name: emotionName, intensity: abs(utility * DeltaLikelihood * relation.like))
+                                relation.addEmotion(emotion: emotion)
+                                agent.updateEmotionalState(emotion: emotion)
 
+                            }
                         }
                     }
                 }
             }
-
         }
-        
-
-        
     }
     
     
