@@ -371,8 +371,6 @@ public class Gamygdala {
         }
     }
     
-    
-    
     public func decayAll( iterations : Int = 3) {
         for _ in 0..<iterations {
             for agent in agents {
