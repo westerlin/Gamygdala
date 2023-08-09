@@ -379,7 +379,7 @@ public class Gamygdala {
                 agent.decay(brain: self)
             }
         }
-        print("updatering decay of emotions .... ")
+        print("updating decay of emotions .... ")
     }
     
     public func decay (intensity : Double) -> Double {
